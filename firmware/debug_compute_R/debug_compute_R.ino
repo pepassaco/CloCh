@@ -45,13 +45,13 @@
 #define PIN_Q13 3   // Bit 13 (MSB)
 
 // Timing constants
-#define CLOCK_FREQUENCY (1UL << 12)  // Do not go over ~50KHz
-#define RESET_DURATION 2000      // Reset pulse duration in ms
+#define CLOCK_FREQUENCY (1UL << 13)  // Do not go over ~50KHz
+#define RESET_DURATION 1000      // Reset pulse duration in ms
 #define STABILIZE_DELAY 1000     // Stabilization delay in ms
-#define CLOCK_DURATION 24000     // Clock generation duration in ms. NEVER below 21s
+#define CLOCK_DURATION 23000     // Clock generation duration in ms. NEVER below 21s
 
 // Statistical measurement parameters
-#define NUMBER_ITERATIONS 2500    // Number of measurement iterations
+#define NUMBER_ITERATIONS 1000    // Number of measurement iterations
 
 // ===== GLOBAL VARIABLES =====
 unsigned long halfPeriod;        // Half period of clock in microseconds
@@ -62,6 +62,7 @@ bool previousB9;
 bool bit10;
 
 // Storage for statistical analysis
+unsigned long measurements[NUMBER_ITERATIONS];
 int currentIteration = 0;
 
 // Function to read the parallel counter value
@@ -176,12 +177,40 @@ unsigned long performMeasurement() {
   return totalCount;
 }
 
+// Function to calculate mean
+double calculateMean() {
+  double sum = 0.0;
+  for (int i = 0; i < NUMBER_ITERATIONS; i++) {
+    sum += measurements[i];
+  }
+  return sum / NUMBER_ITERATIONS;
+}
+
+// Function to calculate standard deviation
+double calculateVariance(double mean) {
+  double sumSquaredDiff = 0.0;
+  for (int i = 0; i < NUMBER_ITERATIONS; i++) {
+    double diff = measurements[i] - mean;
+    sumSquaredDiff += diff * diff;
+  }
+  return sumSquaredDiff / (NUMBER_ITERATIONS - 1);
+}
+
 void setup() {
   // Initialize serial communication
   Serial.begin(9600);
   while (!Serial) {
     ; // Wait for serial port to connect (needed for native USB)
   }
+  
+  Serial.println("Parallel Binary Reader - Statistical Measurement Mode");
+  Serial.print("Clock frequency: ");
+  Serial.print(CLOCK_FREQUENCY);
+  Serial.println(" Hz");
+  Serial.print("Running ");
+  Serial.print(NUMBER_ITERATIONS);
+  Serial.println(" iterations...");
+  Serial.println();
   
   // Calculate clock timing
   halfPeriod = (1000000UL / CLOCK_FREQUENCY) / 2;
@@ -206,23 +235,57 @@ void setup() {
   pinMode(PIN_Q12, INPUT);
   pinMode(PIN_Q13, INPUT);
 
+  Serial.println();
+  Serial.println("CSV fiel with individual results:");
+  Serial.println();
   Serial.print("#f_clk: ");
   Serial.println(CLOCK_FREQUENCY);
   Serial.println("iteration,n_ticks");
   
   // Perform all measurements
   for (int i = 0; i < NUMBER_ITERATIONS; i++) {
+    /*
+    Serial.print("Iteration ");
+    Serial.print(i + 1);
+    Serial.print("/");
+    Serial.print(NUMBER_ITERATIONS);
+    Serial.print("... ");
+    
+    measurements[i] = performMeasurement();
+    
+    Serial.print("Count: ");
+    Serial.println(measurements[i]);
+    */
 
-    unsigned int measurement = performMeasurement();
+    measurements[i] = performMeasurement();
 
     Serial.print(i + 1);
     Serial.print(",");
-    Serial.println(measurement);
+    Serial.println(measurements[i]);
 
   }
   
   Serial.println();
+  Serial.println();
+  Serial.println("========================================");
+  Serial.println("STATISTICAL RESULTS");
+  Serial.println("========================================");
   
+  // Calculate statistics
+  double mean = calculateMean();
+  double var = calculateVariance(mean);
+  
+  Serial.print("Number of iterations: ");
+  Serial.println(NUMBER_ITERATIONS);
+  Serial.print("Mean: ");
+  Serial.println(mean, 2);
+  Serial.print("Variance: ");
+  Serial.println(var, 2);
+  Serial.print("Standard deviation: ");
+  Serial.println(sqrt(var), 2);
+  Serial.print("R approx: ");
+  Serial.println(mean/var, 2);
+  Serial.println("========================================");
 }
 
 void loop() {

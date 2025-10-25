@@ -5,11 +5,19 @@ from scipy import stats
 from scipy.optimize import curve_fit
 import os
 
+EXP_NUMBER = 2
+
+# Moving average window size (set this to control smoothing)
+WINDOW_SIZE = 25 if EXP_NUMBER == 1 else 75
+
+DATA_FILE = f'data/exp{EXP_NUMBER}.csv'
+OUT_FILE = f'plots/preliminary_results_exp{EXP_NUMBER}.pdf'
+
 # Create plots directory if it doesn't exist
 os.makedirs('plots', exist_ok=True)
 
 # Read the CSV file
-df = pd.read_csv('data/exp1.csv', comment='#')
+df = pd.read_csv(DATA_FILE, comment='#')
 
 # Extract data
 iterations = df['iteration'].values
@@ -19,22 +27,17 @@ n_ticks = df['n_ticks'].values
 quantization_step = 16
 quantization_variance = (quantization_step**2) / 12  # Variance of uniform quantization noise
 
-def rational(x, a, b, c):
-    return a / (x + b) + c
-
-
-print("\nTrying temperature correction fit...")
+print("\nCalculating moving average...")
 print("-" * 70)
 
-
 try:
-    # Fit the function
-    popt, _ = curve_fit(rational, iterations, n_ticks, p0=[1000, 1, np.min(n_ticks)], maxfev=10000)
-    fitted = rational(iterations, *popt)
+    # Calculate moving average using pandas (centered window)
+    df_temp = pd.DataFrame({'n_ticks': n_ticks})
+    moving_avg = df_temp['n_ticks'].rolling(window=WINDOW_SIZE, center=True, min_periods=1).mean().values
     
-    # Detrend: remove fit, keep mean
+    # Detrend: remove moving average, keep mean
     mean_n_ticks = np.mean(n_ticks)
-    n_ticks_detrended = n_ticks - (fitted - mean_n_ticks)
+    n_ticks_detrended = n_ticks - (moving_avg - mean_n_ticks)
     
     # Calculate variance (with quantization correction)
     var_measured = np.var(n_ticks_detrended)
@@ -42,18 +45,18 @@ try:
     std_real = np.sqrt(var_real)
     
     results = {
-        'name': 'Rational',
-        'fitted': fitted,
+        'name': 'Moving Average',
+        'fitted': moving_avg,
         'detrended': n_ticks_detrended,
         'variance': var_real,
         'std': std_real,
-        'popt': popt
+        'window_size': WINDOW_SIZE
     }
     
-    print(f"Rational fit: Variance = {var_real:8.4f}, Std = {std_real:6.4f}")
+    print(f"Moving Average (window={WINDOW_SIZE}): Variance = {var_real:8.4f}, Std = {std_real:6.4f}")
         
 except Exception as e:
-    print(f"Fit failed - {e}")
+    print(f"Moving average calculation failed - {e}")
 
 print("-" * 70)
 print()
@@ -88,13 +91,13 @@ fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
 
 # Original data with fit
 ax1.plot(iterations, n_ticks, 'o', alpha=0.6, markersize=4, label='Data points')
-ax1.plot(iterations, fitted_line, 'r-', linewidth=2, label=f'{fit_type} fit')
+ax1.plot(iterations, fitted_line, 'r-', linewidth=2, label=f'{fit_type} (window={WINDOW_SIZE})')
 ax1.fill_between(iterations, fitted_line - std_original, 
                   fitted_line + std_original, alpha=0.3, color='red', 
                   label=f'±1σ ({std_original:.2f})')
 ax1.set_xlabel('Iteration')
 ax1.set_ylabel('Number of ticks')
-ax1.set_title(f'Original Data with {fit_type} fit (σ = {std_original:.2f})')
+ax1.set_title(f'Original Data with {fit_type} (σ = {std_original:.2f})')
 ax1.legend()
 ax1.grid(True, alpha=0.3)
 
@@ -129,13 +132,14 @@ ax4.grid(True, alpha=0.3)
 plt.tight_layout()
 
 # Save the plot
-plt.savefig('plots/preliminary_results.pdf', dpi=300, bbox_inches='tight')
-print(f"Plot saved to plots/preliminary_results.pdf")
+
+plt.savefig(OUT_FILE, dpi=300, bbox_inches='tight')
+print(f"Plot saved to {OUT_FILE}")
 
 plt.show()
 
 # Print statistics
-print(f"\n{fit_type} fit selected")
+print(f"\n{fit_type} (window={WINDOW_SIZE}) selected")
 print(f"\n=== Original Data ===")
 print(f"Mean: {mean_n_ticks:.4f}")
 print(f"Measured Variance: {var_original_measured:.4f}")
