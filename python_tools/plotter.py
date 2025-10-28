@@ -8,7 +8,7 @@ import os
 EXP_NUMBER = 2
 
 # Moving average window size (set this to control smoothing)
-WINDOW_SIZE = 25 if EXP_NUMBER == 1 else 75
+WINDOW_SIZE = 25 if EXP_NUMBER == 1 else 60
 
 DATA_FILE = f'data/exp{EXP_NUMBER}.csv'
 OUT_FILE = f'plots/preliminary_results_exp{EXP_NUMBER}.pdf'
