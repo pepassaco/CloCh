@@ -7,8 +7,8 @@ import os
 
 EXP_NUMBER = 2
 
-# Moving average window size (set this to control smoothing)
-WINDOW_SIZE = 25 if EXP_NUMBER == 1 else 60
+# Temperature corection (at 30s per experiment, we consider temperature to be approxiamtely constant over 15min intervals)
+WINDOW_SIZE = 40
 
 DATA_FILE = f'data/exp{EXP_NUMBER}.csv'
 OUT_FILE = f'plots/preliminary_results_exp{EXP_NUMBER}.pdf'
@@ -86,6 +86,41 @@ std_detrended = np.sqrt(var_detrended)
 R_original = mean_n_ticks / var_original if var_original > 0 else np.inf
 R_detrended = mean_detrended / var_detrended if var_detrended > 0 else np.inf
 
+# ========== ERROR CALCULATIONS ==========
+# Sample sizes
+n_original = len(n_ticks)
+n_detrended = len(n_ticks_detrended)
+
+# Error in mean (standard error of the mean)
+error_mean_original = std_original / np.sqrt(n_original)
+error_mean_detrended = std_detrended / np.sqrt(n_detrended)
+
+# Error in variance (for normal distribution)
+# σ(var) = var × sqrt(2/(n-1))
+error_var_original = var_original * np.sqrt(2.0 / (n_original - 1)) if n_original > 1 else 0
+error_var_detrended = var_detrended * np.sqrt(2.0 / (n_detrended - 1)) if n_detrended > 1 else 0
+
+# Error in standard deviation
+# σ(std) = std / sqrt(2(n-1))
+error_std_original = std_original / np.sqrt(2.0 * (n_original - 1)) if n_original > 1 else 0
+error_std_detrended = std_detrended / np.sqrt(2.0 * (n_detrended - 1)) if n_detrended > 1 else 0
+
+# Error in R = mean/variance using error propagation
+# σ(R) = R × sqrt((σ_mean/mean)² + (σ_var/var)²)
+if var_original > 0 and mean_n_ticks > 0:
+    rel_error_mean_orig = error_mean_original / mean_n_ticks
+    rel_error_var_orig = error_var_original / var_original
+    error_R_original = R_original * np.sqrt(rel_error_mean_orig**2 + rel_error_var_orig**2)
+else:
+    error_R_original = np.inf
+
+if var_detrended > 0 and mean_detrended > 0:
+    rel_error_mean_detr = error_mean_detrended / mean_detrended
+    rel_error_var_detr = error_var_detrended / var_detrended
+    error_R_detrended = R_detrended * np.sqrt(rel_error_mean_detr**2 + rel_error_var_detr**2)
+else:
+    error_R_detrended = np.inf
+
 # Create 2x2 figure
 fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(14, 10))
 
@@ -141,17 +176,17 @@ plt.show()
 # Print statistics
 print(f"\n{fit_type} (window={WINDOW_SIZE}) selected")
 print(f"\n=== Original Data ===")
-print(f"Mean: {mean_n_ticks:.4f}")
+print(f"Mean: {mean_n_ticks:.4f} ± {error_mean_original:.4f}")
 print(f"Measured Variance: {var_original_measured:.4f}")
 print(f"Quantization Variance: {quantization_variance:.4f}")
-print(f"Real Variance: {var_original:.4f}")
-print(f"Real Std: {std_original:.4f}")
-print(f"R (mean/variance): {R_original:.6f}")
+print(f"Real Variance: {var_original:.4f} ± {error_var_original:.4f}")
+print(f"Real Std: {std_original:.4f} ± {error_std_original:.4f}")
+print(f"R (mean/variance): {R_original:.6f} ± {error_R_original:.6f}")
 
 print(f"\n=== Temperature corrected Data ===")
-print(f"Mean: {mean_detrended:.4f}")
+print(f"Mean: {mean_detrended:.4f} ± {error_mean_detrended:.4f}")
 print(f"Measured Variance: {var_detrended_measured:.4f}")
 print(f"Quantization Variance: {quantization_variance:.4f}")
-print(f"Real Variance: {var_detrended:.4f}")
-print(f"Real Std: {std_detrended:.4f}")
-print(f"R (mean/variance): {R_detrended:.6f}")
+print(f"Real Variance: {var_detrended:.4f} ± {error_var_detrended:.4f}")
+print(f"Real Std: {std_detrended:.4f} ± {error_std_detrended:.4f}")
+print(f"R (mean/variance): {R_detrended:.6f} ± {error_R_detrended:.6f}")
