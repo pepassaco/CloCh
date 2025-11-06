@@ -88,18 +88,40 @@ R_detrended = mean_detrended / var_detrended if var_detrended > 0 else np.inf
 
 # Create figure
 fig, ax4 = plt.subplots(1, 1, figsize=(14, 10))
-ax4.hist(n_ticks_detrended, bins=30, edgecolor='black', alpha=0.7, color='green')
-ax4.axvline(mean_detrended, color='r', linestyle='--', linewidth=2)
-ax4.set_xlabel('Number of ticks')
-ax4.set_ylabel('Frequency')
+
+# Plot histogram and get bin information
+n, bins, patches = ax4.hist(n_ticks_detrended, bins=30, edgecolor='black', alpha=0.7, color='green', label='Data')
+
+# Fit normal distribution
+mu = mean_detrended
+sigma = std_detrended
+
+# Create x values for the fitted curve
+x_min, x_max = ax4.get_xlim()
+x = np.linspace(x_min, x_max, 500)
+
+# Calculate the normal distribution PDF
+pdf = stats.norm.pdf(x, mu, sigma)
+
+# Scale PDF to match histogram (multiply by total count and bin width)
+bin_width = bins[1] - bins[0]
+pdf_scaled = pdf * len(n_ticks_detrended) * bin_width
+
+# Plot the fitted Gaussian
+ax4.plot(x, pdf_scaled, 'b--', linewidth=2, label=f'Normal fit')# (μ={mu:.1f}, σ={sigma:.2f})')
+
+ax4.axvline(mean_detrended, color='r', linestyle='--', linewidth=2, label=f'Mean')# = {mean_detrended:.1f}')
+ax4.set_xlabel('Number of ticks', fontsize=22)
+ax4.set_ylabel('Frequency', fontsize=22)
 if EXP_NUMBER == 1:
     ax4.set_xlim(167980,168060)
+ax4.tick_params(axis='both', which='major', labelsize=22, length=16, width=2)
 ax4.grid(True, alpha=0.3)
+ax4.legend(fontsize=20, loc='best')
 
 plt.tight_layout()
 
 # Save the plot
-
 plt.savefig(OUT_FILE, dpi=300, bbox_inches='tight')
 print(f"Plot saved to {OUT_FILE}")
 
